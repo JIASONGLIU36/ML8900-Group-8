@@ -1,3 +1,7 @@
+# This code is taken from https://github.com/avinash-218/Mask-RCNN-TF2.7.0-keras2.7.0
+# Since Mask RCNN is based on Faster RCNN with FPN and RoiAlign, we are going to use
+# same model to train and test with two different results (mask and bounding box)
+
 """
 Mask R-CNN
 The main Mask R-CNN model implementation.

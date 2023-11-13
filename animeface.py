@@ -1,4 +1,3 @@
-# Author: Jiasong Liu
 import os
 import json
 import uuid
@@ -20,12 +19,13 @@ LOGDIR = os.path.join(ROOT_PATH, "logs")
 class animeTrainingConfig(config.Config):
     # name of the config
     NAME = "animeFace"
-    # since we have 3080ti with 12GB memory, we could use 2 images per batch
+    # since I have 3080ti with 12GB memory, I used 4 images per batch
+    # however if the performance is bad then turn down for less images 
     IMAGES_PER_GPU = 4
     # we have 2 classes: BG and animefaces
     NUM_CLASSES = 2
-    # training step for each epoch (971/4)
-    STEPS_PER_EPOCH = 243 
+    # training step for each epoch (1055/4) (image/batch size)
+    STEPS_PER_EPOCH = 264 
 
     # validation step for each epoch (140/4)
     VALIDATION_STEPS = 35
@@ -122,11 +122,23 @@ def color_filter(model, image_path=""):
     out = model.detect([image], verbose=1)[0]
     # combine all masks (-1 is last index)
     mask = (np.sum(out['masks'], -1, keepdims=True) >= 1)
+
     # color image if mask is not 0
     if mask.shape[0] > 0:
         splash = np.where(mask, image, gray).astype(np.uint8)
     else:
         splash = gray
+
+    # if the roi list is not empty then draw bounding box
+    if out['rois'].shape[0] > 0:
+        for i in out['rois']:
+            start = (i[0], i[1])
+            end = (i[2], i[3])
+            bounding_box = skimage.draw.rectangle_perimeter(start, end=end, shape=image.shape)
+            image_box = np.zeros((image.shape[0], image.shape[1]), dtype=np.int32)
+            image_box[bounding_box[0], bounding_box[1]] = 1
+            splash[bounding_box[0], bounding_box[1]] = [255, 110, 90]
+
     # unique filename
     filename = "{uuid}_{date:%Y%m%d}".format(uuid = uuid.uuid4(), date = datetime.now())
     png_file = filename+".png"
@@ -143,6 +155,7 @@ if __name__ == '__main__':
                         default=LOGDIR, metavar="/path/to/anime/image")
     parser.add_argument('--weights', required=True, metavar="/path/to/weights.h5",help=".h5 file only")
     parser.add_argument('-c','--coco', default=False, action='store_true',help="exclude classes")
+    parser.add_argument('-w','--without_weight', default=False, action='store_true',help="training without weight")
 
 
     args = parser.parse_args()
@@ -166,11 +179,14 @@ if __name__ == '__main__':
     # load weight path
     weight_path = args.weights
 
+    # doing mitigate learning
     if args.coco == True:
         model.load_weights(weight_path, by_name=True, exclude=["mrcnn_class_logits", "mrcnn_bbox_fc",
             "mrcnn_bbox", "mrcnn_mask"])
-    else:
+    elif args.without_weight == False:
         model.load_weights(weight_path, by_name=True)
+    else:
+        pass # training without loading any weight (Not recommended! The model is too big, taking too much GPU RAM, Loss will be high)
 
     # Train or evaluate
     if args.action == "train":
@@ -179,7 +195,7 @@ if __name__ == '__main__':
         color_filter(model, image_path=args.image)
     else:
         print("'{}' is not recognized. "
-              "Use 'train' or 'detect'".format(args.command))
+              "Use 'train' or 'detect'".format(args.action))
 
 print()
 print(ROOT_PATH)
