@@ -1,4 +1,5 @@
 # This code is taken from https://github.com/avinash-218/Mask-RCNN-TF2.7.0-keras2.7.0
+# The author is Waleed Abdulla
 # Since Mask RCNN is based on Faster RCNN with FPN and RoiAlign, we are going to use
 # same model to train and test with two different results (mask and bounding box)
 
@@ -26,9 +27,9 @@ import tensorflow.keras.utils as KU
 from tensorflow.python.eager import context
 import tensorflow.keras.models as KM
 
-from mrcnn import utils
+#from mrcnn 
+import utils
 import sys
-from mrcnn.parallel_model import ParallelModel
 
 # Requires TensorFlow 2.0+
 from distutils.version import LooseVersion
@@ -2305,7 +2306,8 @@ class MaskRCNN(object):
         
         # self.checkpoint_path = os.path.join(self.log_dir, "mask_rcnn_{}_*epoch*.h5".format(
         #    self.config.NAME.lower()))
-        self.checkpoint_path = os.path.join(self.model_dir, self.config.NAME.lower(), "{}.h5".format(self.config.NAME.lower()))
+        #self.checkpoint_path = os.path.join(self.model_dir, self.config.NAME.lower(), "{}.h5".format(self.config.NAME.lower()))
+        self.checkpoint_path = os.path.join(self.model_dir, "Mask_RCNN_animeFace.h5")
         
         # self.checkpoint_path = self.checkpoint_path.replace(
         #    "*epoch*", "{epoch:04d}")

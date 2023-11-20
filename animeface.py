@@ -1,7 +1,8 @@
+# Author: Jiasong Liu
+# This class is initializing mask RCNN for training and detection. It also modify the result for better visualization
 import os
 import json
 import uuid
-from datetime import datetime
 import utils
 import config
 import argparse
@@ -24,11 +25,11 @@ class animeTrainingConfig(config.Config):
     IMAGES_PER_GPU = 4
     # we have 2 classes: BG and animefaces
     NUM_CLASSES = 2
-    # training step for each epoch (1055/4) (image/batch size)
-    STEPS_PER_EPOCH = 264 
+    # training step for each epoch (38/4) (image/batch size)
+    STEPS_PER_EPOCH = 10
 
-    # validation step for each epoch (140/4)
-    VALIDATION_STEPS = 35
+    # validation step for each epoch (12/4)
+    VALIDATION_STEPS = 3
 
     #VALIDATION_STEPS = 10
     # detection confidence
@@ -111,23 +112,55 @@ def train(model):
     model.train(dataset_train, dataset_val, learning_rate=config.Config.LEARNING_RATE, epochs=30, layers='heads')
 
 # create filter on image
-def color_filter(model, image_path=""):
+def color_filter(model, image_path="", image_id=uuid.uuid4()):
     print("analysis image on {image}".format(image=image_path))
 
     image = skimage.io.imread(image_path)
     # convert image to 3 channel RGB
     gray = (skimage.color.gray2rgb(skimage.color.rgb2gray(image)) * 255).astype(np.uint8)
 
+    # intialize mask to red
+    mask_color = gray.copy()
+    mask_color[:, : , 0] = 255
+
+    # empty list for cropped images for Resnet and VGG
+    # mask RCNN
+    crop_img_Mask_RCNN_Res_Vgg = []
+    crop_img_Mask_RCNN_V4 = []
     # detect faces
     out = model.detect([image], verbose=1)[0]
-    # combine all masks (-1 is last index)
-    mask = (np.sum(out['masks'], -1, keepdims=True) >= 1)
 
+    # combine all masks (-1 is last index)
+    #mask = (np.sum(out['masks'], -1, keepdims=True) >= 1)
     # color image if mask is not 0
-    if mask.shape[0] > 0:
-        splash = np.where(mask, image, gray).astype(np.uint8)
+    if out['masks'].shape[2] > 0:
+        splash_1 = np.where(out['masks'][:, :, 0].reshape((out['masks'].shape[0], out['masks'].shape[1], 1)), mask_color, image).astype(np.uint8)
+        # black out the area without mask
+        black_mask = np.where(out['masks'][:, :, 0].reshape((out['masks'].shape[0], out['masks'].shape[1], 1)), image, 0).astype(np.uint8)
+        crop_mask = crop_mask_img(out['masks'][:, :, 0]) # and get the area with mask only
+        # crop image 
+        crop_img = crop_img_coord(black_mask, crop_mask)
+        resize_img = skimage.transform.resize(crop_img, (224, 224), anti_aliasing=True)
+        crop_img_Mask_RCNN_Res_Vgg.append((resize_img*255).astype(np.uint8))
+        resize_img = skimage.transform.resize(crop_img, (299, 299), anti_aliasing=True)
+        crop_img_Mask_RCNN_V4.append((resize_img*255).astype(np.uint8))
+
+        for i in range(1, out['masks'].shape[2]):
+            # update color of different masks
+            mask_color = gray.copy()
+            mask_color[:, : , i%3] = 255
+            splash_1 = np.where(out['masks'][:, :, i].reshape((out['masks'].shape[0], out['masks'].shape[1], 1)), mask_color, splash_1).astype(np.uint8)
+            # black out the area without mask
+            black_mask = np.where(out['masks'][:, :, i].reshape((out['masks'].shape[0], out['masks'].shape[1], 1)), image, 0).astype(np.uint8)
+            crop_mask = crop_mask_img(black_mask) # and get the area with mask only
+            # crop image 
+            crop_img = crop_img_coord(black_mask, crop_mask)
+            resize_img = skimage.transform.resize(crop_img, (224, 224), anti_aliasing=True)
+            crop_img_Mask_RCNN_Res_Vgg.append((resize_img*255).astype(np.uint8))
+            resize_img = skimage.transform.resize(crop_img, (299, 299), anti_aliasing=True)
+            crop_img_Mask_RCNN_V4.append((resize_img*255).astype(np.uint8))
     else:
-        splash = gray
+        splash_1 = image.copy()
 
     # if the roi list is not empty then draw bounding box
     if out['rois'].shape[0] > 0:
@@ -137,12 +170,90 @@ def color_filter(model, image_path=""):
             bounding_box = skimage.draw.rectangle_perimeter(start, end=end, shape=image.shape)
             image_box = np.zeros((image.shape[0], image.shape[1]), dtype=np.int32)
             image_box[bounding_box[0], bounding_box[1]] = 1
-            splash[bounding_box[0], bounding_box[1]] = [255, 110, 90]
+            # draw bounding box on mask RCNN since the number is hard to see
+            splash_1[bounding_box[0], bounding_box[1]] = [255, 255, 255]
+    else:
+        pass
 
-    # unique filename
-    filename = "{uuid}_{date:%Y%m%d}".format(uuid = uuid.uuid4(), date = datetime.now())
-    png_file = filename+".png"
-    skimage.io.imsave(png_file, splash)
+    # constant filename
+    filename = "./temp_img/{uuid}".format(uuid = image_id)
+    png_file_mask = filename+"_mask.png"
+    # generate 2 images for display
+    skimage.io.imsave(png_file_mask, splash_1)
+
+    # generate images for 2nd step
+    # Resnet & VGG
+    for i, img in enumerate(crop_img_Mask_RCNN_Res_Vgg):
+        png_file_VGG_RES = filename+"_VGG_RES_Mask_"+str(i)+".png"
+        skimage.io.imsave(png_file_VGG_RES, img)
+    # InceptionV4
+    for i, img in enumerate(crop_img_Mask_RCNN_V4):
+        png_file_V4 = filename+"_V4_Mask_"+str(i)+".png"
+        skimage.io.imsave(png_file_V4, img)
+
+    # return Roi to draw text
+    return [out['rois'], out["scores"]]
+
+# evaluation function
+def detection_evalution(model, image_path=""):
+
+    image = skimage.io.imread(image_path)
+    # detect faces
+    out = model.detect([image], verbose=1)[0]
+
+    # return Roi to draw text
+    return out['masks']
+
+# crop image by coordinates
+def crop_img_coord(image, coord):
+    width = np.arange(coord[1], coord[3])
+    height = np.arange(coord[0], coord[2])
+    crop_img = image[height, :][:, width]
+    return crop_img
+
+# crop mask into a smaller shape
+def crop_mask_img(origin_mask):
+    top = 0
+    bottom = 0
+    left = 0
+    right = 0
+    # get mask coordinates from left to right
+    for i in range(origin_mask.shape[0]):
+        if left == 0:
+            if origin_mask[i, :].any():
+                left = i
+
+        if left != 0 and right == 0:
+            if not origin_mask[i, :].any():
+                right = i
+        # extend right and bottom a little bit to avoid little island on the mask
+        if left != 0 and right != 0:
+            if origin_mask[i, :].any():
+                right = i
+        
+    # get mask coordinates from top to bottom
+    for i in range(origin_mask.shape[1]):
+        if top == 0:
+            if origin_mask[:, i].any():
+                top = i
+
+        if top != 0 and bottom == 0:
+            if not origin_mask[:, i].any():
+                bottom = i
+        # extend right and bottom a little bit to avoid little island on the mask
+        if top != 0 and bottom != 0:
+            if origin_mask[:, i].any():
+                bottom = i
+
+    return [left, top, right, bottom]
+
+
+# default setting for back_end
+def init_model(weight_path):
+    configs = animeTestingConfig()
+    model = ml.MaskRCNN(mode='inference', config=configs, model_dir=LOGDIR)
+    model.load_weights(weight_path, by_name=True)
+    return model
 
 if __name__ == '__main__':
 
@@ -153,7 +264,7 @@ if __name__ == '__main__':
     parser.add_argument('--image', help="the image use for detect faces", required=False, metavar="/path/to/anime/image")
     parser.add_argument('--log', help="path to store checkpoints", required=False,
                         default=LOGDIR, metavar="/path/to/anime/image")
-    parser.add_argument('--weights', required=True, metavar="/path/to/weights.h5",help=".h5 file only")
+    parser.add_argument('--weights', metavar="/path/to/weights.h5",help=".h5 file only")
     parser.add_argument('-c','--coco', default=False, action='store_true',help="exclude classes")
     parser.add_argument('-w','--without_weight', default=False, action='store_true',help="training without weight")
 
@@ -179,13 +290,16 @@ if __name__ == '__main__':
     # load weight path
     weight_path = args.weights
 
+    if args.action == 'detect':
+        model.load_weights(weight_path, by_name=True)
+
     # doing mitigate learning
-    if args.coco == True:
+    if args.coco == True and args.action == 'train':
         model.load_weights(weight_path, by_name=True, exclude=["mrcnn_class_logits", "mrcnn_bbox_fc",
             "mrcnn_bbox", "mrcnn_mask"])
-    elif args.without_weight == False:
+    elif args.without_weight == False and args.action == 'train':
         model.load_weights(weight_path, by_name=True)
-    else:
+    elif args.action == 'train':
         pass # training without loading any weight (Not recommended! The model is too big, taking too much GPU RAM, Loss will be high)
 
     # Train or evaluate
@@ -196,6 +310,4 @@ if __name__ == '__main__':
     else:
         print("'{}' is not recognized. "
               "Use 'train' or 'detect'".format(args.action))
-
-print()
-print(ROOT_PATH)
+    print("Finished running")
