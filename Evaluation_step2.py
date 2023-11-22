@@ -89,7 +89,7 @@ def load_dataset(model_name, model_type=None):
             Image_list.append(curr_image)
 
     X_test = np.array(Image_list)
-    X_test = X_test.reshape((161, 224, 224, 3))
+    X_test = X_test.reshape((-1, image_row, image_column, 3))
     y_test = np.array(label_list)
     y_test = y_test.astype(int)
 
