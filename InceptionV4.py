@@ -1,4 +1,5 @@
 # Author: Jiasong Liu, Fangdi Liu
+# This is implementation for InceptionV4 model.
 import os
 import json
 import argparse
