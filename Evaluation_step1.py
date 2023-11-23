@@ -139,14 +139,14 @@ def Evalution_function_step1(image_batch_path, label_path, iou_threshold):
 
                 
     # now we can compute Precision, Recall and F1 score 
-    print("Evalutation for Mask RCNN:")         
+    print("Evaluation for Mask RCNN:")         
     precision = Mask_pred_list[0]/(Mask_pred_list[0]+Mask_pred_list[1])
     recall = Mask_pred_list[0]/(Mask_pred_list[0]+Mask_pred_list[2])
     print("Precision: {:.2%}".format(precision))      
     print("Recall: {:.2%}".format(recall))     
     print("F1 score: {:.2%}".format((2*precision*recall)/(precision+recall)))    
 
-    print("Evalutation for Faster RCNN:")         
+    print("Evaluation for Faster RCNN:")         
     precision = Faster_pred_list[0]/(Faster_pred_list[0]+Faster_pred_list[1])
     recall = Faster_pred_list[0]/(Faster_pred_list[0]+Faster_pred_list[2])
     print("Precision: {:.2%}".format(precision))      
