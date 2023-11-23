@@ -1,4 +1,5 @@
 # Author: Jiasong Liu, Fangdi Liu
+# This is implementation for diffenent ResNet models, which are resnet 34, 50, 101.
 import os
 import json
 import argparse
