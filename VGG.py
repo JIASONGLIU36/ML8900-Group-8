@@ -1,4 +1,5 @@
 # Author: Jiasong Liu, Fangdi Liu
+# This is implementation for diffenent VGG models, which are VGG 16, 19.
 import os
 import json
 import argparse
