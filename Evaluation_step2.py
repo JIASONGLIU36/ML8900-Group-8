@@ -1,6 +1,8 @@
 # Author: Fangdi Liu
-# Evaluate Step 2 algorithms: Resnet, VGG, InceptionV4. Confusion matrix and other metrics are
-# given
+# Evaluate Step 2 algorithms: Resnet, VGG, InceptionV4. Confusion matrix and other metrics are given
+# This program is used to evaluate for models in step2, which include ResNet, VGG and InceptionV4
+# Output precision, recall, f1-score, ROC curve, AOC, accuracy and confusion matrix.
+
 import os
 import json
 import argparse
