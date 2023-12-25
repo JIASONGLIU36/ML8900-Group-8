@@ -1,6 +1,6 @@
 # Deep Learning Classification for Anime Cartoon Faces
 
-### Author: Jiasong Liu, Fangdi Liu, .Ratnaker
+### Author: Jiasong Liu, Fangdi Liu, .Ratnakar
 
 In this project, we are going to classify anime faces by doing 2 steps. The first step is to use a Mask/Faster RCNN learning model to recognize if the input image contains anime faces. And the second step is to use 3 differnt deep learning models to classify emotion.
 
